@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 from src.grid import build_grid
@@ -44,18 +45,31 @@ def run_simulation(config):
     barrier_idx = int(np.argmin(np.abs(x - 500.0)))
     records = []
 
+    case_dir_csv = os.path.join("output", "csv", config.case_name)
+    case_dir_frames = os.path.join("output", "frames", config.case_name)
+    case_dir_gif = os.path.join("output", "gif")
+    os.makedirs(case_dir_csv, exist_ok=True)
+    os.makedirs(case_dir_frames, exist_ok=True)
+    os.makedirs(case_dir_gif, exist_ok=True)
+
     while t < config.t_end:
         dt = compute_dt(h, q, config.g, dx, config.cfl, config.dt_max, config.h_dry)
         if t + dt > config.t_end:
             dt = config.t_end - t
 
-        # Hydrodynamic step
         h, q = rk2_hydro_step(h, q, zb, t, dt, config, dx)
 
-        # Morphodynamic step
-        zb, diag = exner_step(zb, h, q, dt, dx, config)
+        if config.enable_morphodynamics:
+            zb, diag = exner_step(zb, h, q, dt, dx, config)
+            qs = diag["qs_cell"]
+            theta = diag["theta"]
+            tau_b = diag["tau_b"]
+        else:
+            u_tmp = velocity(h, q, config.h_dry)
+            qs = np.zeros_like(h)
+            theta = np.zeros_like(h)
+            tau_b = np.zeros_like(h)
 
-        # Wet/dry cleanup
         h[h <= config.h_dry] = 0.0
         q[h <= config.h_dry] = 0.0
 
@@ -66,24 +80,55 @@ def run_simulation(config):
             eta = free_surface(h, zb)
             u = velocity(h, q, config.h_dry)
 
-            qs = diag["qs_cell"]
-            theta = diag["theta"]
-            tau_b = diag["tau_b"]
+            import pandas as pd
+            df = pd.DataFrame({
+                "x": x,
+                "zb": zb,
+                "h": h,
+                "eta": eta,
+                "u": u,
+                "q": q,
+                "qs": qs,
+                "theta": theta,
+                "tau_b": tau_b
+            })
+            df.to_csv(os.path.join(case_dir_csv, f"profile_{step:05d}.csv"), index=False)
 
-            write_profile_csv(step, t, x, zb, h, eta, u, q, qs, theta, tau_b)
-            save_frame(step, t, x, zb, h, eta, q, theta)
+            import matplotlib.pyplot as plt
+            fig, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
 
-            eta_left = tidal_stage(t, config.eta_mean, config.eta_amp, config.eta_period)
+            axes[0].plot(x, zb, color="saddlebrown", linewidth=2, label="bed")
+            axes[0].plot(x, eta, color="royalblue", linewidth=2, label="free surface")
+            axes[0].fill_between(x, zb, eta, where=(h > 1e-8), color="lightskyblue", alpha=0.5)
+            axes[0].set_ylabel("Elevation [m]")
+            axes[0].legend(loc="best")
+            axes[0].set_title(f"{config.case_name}, t = {t:.2f} s")
+
+            axes[1].plot(x, q, color="darkred", linewidth=1.5, label="discharge q")
+            axes[1].axhline(0.0, color="k", linewidth=0.75)
+            axes[1].set_ylabel("q")
+            axes[1].legend(loc="best")
+
+            axes[2].plot(x, theta, color="darkgreen", linewidth=1.5, label="theta")
+            axes[2].axhline(0.0, color="k", linewidth=0.75)
+            axes[2].set_ylabel("theta")
+            axes[2].set_xlabel("x [m]")
+            axes[2].legend(loc="best")
+
+            fig.tight_layout()
+            frame_path = os.path.join(case_dir_frames, f"frame_{step:05d}.png")
+            fig.savefig(frame_path, dpi=120)
+            plt.close(fig)
+
+            eta_left = tidal_stage(t, config.eta_mean, config.eta_amp, config.eta_period) if config.left_bc == "tide" else np.nan
             inundation_extent = np.sum(h > config.h_dry) * dx
 
             records.append({
                 "time": t,
                 "eta_left": eta_left,
-                "barrier_depth": h[barrier_idx],
-                "barrier_discharge": q[barrier_idx],
-                "barrier_velocity": u[barrier_idx],
-                "barrier_qs": qs[barrier_idx],
-                "barrier_theta": theta[barrier_idx],
+                "barrier_depth": h[barrier_idx] if barrier_idx < len(h) else np.nan,
+                "barrier_discharge": q[barrier_idx] if barrier_idx < len(q) else np.nan,
+                "barrier_velocity": u[barrier_idx] if barrier_idx < len(u) else np.nan,
                 "inundation_extent": inundation_extent,
                 "max_eta": np.max(eta),
                 "min_eta": np.min(eta),
@@ -93,11 +138,19 @@ def run_simulation(config):
 
             next_output += config.output_interval
 
-    write_timeseries_csv(records)
-    build_gif()
+    import pandas as pd
+    pd.DataFrame(records).to_csv(os.path.join(case_dir_csv, "timeseries.csv"), index=False)
 
-    print("Simulation complete.")
-    print("Generated files:")
-    print("  output/csv/timeseries.csv")
-    print("  output/csv/profile_*.csv")
-    print("  output/gif/tidal_cycle.gif")
+    import imageio.v2 as imageio
+    frames = sorted(
+        os.path.join(case_dir_frames, f)
+        for f in os.listdir(case_dir_frames)
+        if f.endswith(".png")
+    )
+    if frames:
+        images = [imageio.imread(f) for f in frames]
+        imageio.mimsave(os.path.join(case_dir_gif, f"{config.case_name}.gif"), images, duration=0.15)
+
+    print(f"Simulation complete for case: {config.case_name}")
+    print(f"CSV output: output/csv/{config.case_name}/")
+    print(f"GIF output: output/gif/{config.case_name}.gif")

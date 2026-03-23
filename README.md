@@ -124,3 +124,36 @@ python run_model.py
 - Then activate full morphodynamics.
 - The Engelund–Hansen coefficient `alpha_eh` may need tuning for your application.
 - If the inland boundary is closed, change `right_bc="wall"` in `cases/tidal_barrier_case.py`.
+
+
+## Validation suite
+
+A fixed-bed validation suite is included to verify the hydrodynamic core before morphodynamic runs.
+
+### Cases
+
+1. **Lake at rest over nonflat topography**
+   - verifies well-balancing
+   - expected result: no spurious velocity and constant free surface
+
+2. **Dam-break over flat bed**
+   - verifies shock capturing
+   - expected result: stable propagation of rarefaction and bore
+
+3. **Wetting/drying on a sloping beach**
+   - verifies shoreline motion and inundation/recession
+
+4. **Fixed-bed tidal barrier case**
+   - verifies tidal forcing, overtopping, and reversal without bed change
+
+### Run validation
+
+```bash
+python run_validation.py
+```
+
+### Validation outputs
+
+Each case writes outputs to:
+- `output/csv/<case_name>/`
+- `output/gif/<case_name>.gif`

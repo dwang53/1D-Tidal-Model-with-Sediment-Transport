@@ -20,6 +20,7 @@ class ModelConfig:
     theta_cr: float
     alpha_eh: float
     use_theta_threshold: bool
+    enable_morphodynamics: bool
 
     # time
     t_end: float
@@ -33,7 +34,11 @@ class ModelConfig:
     eta_period: float
 
     # boundary conditions
-    right_bc: str   # "transmissive" or "wall"
+    left_bc: str     # "tide", "transmissive", "wall"
+    right_bc: str    # "transmissive" or "wall"
 
     # initial condition
     eta0: float
+
+    # optional benchmark metadata
+    case_name: str = "unnamed_case"

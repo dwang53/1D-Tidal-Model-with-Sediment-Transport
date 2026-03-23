@@ -6,8 +6,13 @@ def tidal_stage(t, eta_mean, eta_amp, eta_period):
 def build_ghost_cells(h, q, zb, t, config):
     """
     One ghost cell on each side.
-    Left: prescribed tidal stage + interior-compatible velocity
-    Right: transmissive or wall
+    Supported left boundary conditions:
+      - tide
+      - transmissive
+      - wall
+    Supported right boundary conditions:
+      - transmissive
+      - wall
     """
     n = len(h)
 
@@ -21,16 +26,29 @@ def build_ghost_cells(h, q, zb, t, config):
 
     # Left boundary
     zbg[0] = zbg[1]
-    eta_b = tidal_stage(t, config.eta_mean, config.eta_amp, config.eta_period)
-    h_b = max(0.0, eta_b - zbg[0])
 
-    if hg[1] > config.h_dry:
-        u_b = qg[1] / hg[1]
+    if config.left_bc == "tide":
+        eta_b = tidal_stage(t, config.eta_mean, config.eta_amp, config.eta_period)
+        h_b = max(0.0, eta_b - zbg[0])
+
+        if hg[1] > config.h_dry:
+            u_b = qg[1] / hg[1]
+        else:
+            u_b = 0.0
+
+        hg[0] = h_b
+        qg[0] = h_b * u_b if h_b > config.h_dry else 0.0
+
+    elif config.left_bc == "transmissive":
+        hg[0] = hg[1]
+        qg[0] = qg[1]
+
+    elif config.left_bc == "wall":
+        hg[0] = hg[1]
+        qg[0] = -qg[1]
+
     else:
-        u_b = 0.0
-
-    hg[0] = h_b
-    qg[0] = h_b * u_b if h_b > config.h_dry else 0.0
+        raise ValueError(f"Unknown left_bc: {config.left_bc}")
 
     # Right boundary
     zbg[-1] = zbg[-2]
@@ -38,9 +56,11 @@ def build_ghost_cells(h, q, zb, t, config):
     if config.right_bc == "transmissive":
         hg[-1] = hg[-2]
         qg[-1] = qg[-2]
+
     elif config.right_bc == "wall":
         hg[-1] = hg[-2]
         qg[-1] = -qg[-2]
+
     else:
         raise ValueError(f"Unknown right_bc: {config.right_bc}")
 

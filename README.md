@@ -46,58 +46,58 @@ For 1D tidal flow over a barrier with wetting/drying:
 
 ### Hydrodynamics
 
-\[
+$$
 \partial_t h + \partial_x q = 0
-\]
+$$
 
-\[
+$$
 \partial_t q + \partial_x \left(\frac{q^2}{h} + \frac12 g h^2 \right)
 =
 - g h \partial_x z_b + S_f
-\]
+$$
 
 where:
-- \(h\) = water depth
-- \(q = hu\) = unit discharge
-- \(u\) = depth-averaged velocity
-- \(z_b\) = bed elevation
+- $h$ = water depth
+- $q = hu$ = unit discharge
+- $u$ = depth-averaged velocity
+- $z_b$ = bed elevation
 
 ### Friction
 
 Manning friction is applied semi-implicitly:
-\[
+$$
 \tau_b = \rho_w g n^2 \frac{u |u|}{h^{1/3}}
-\]
+$$
 
 ### Exner bed evolution
 
-\[
+$$
 (1-\lambda_p)\partial_t z_b + \partial_x q_s = 0
-\]
+$$
 
 ### Sediment transport
 
 A practical signed Engelund–Hansen transport form is used:
-\[
+$$
 q_s = \operatorname{sgn}(u)\,\alpha_{EH}\,\sqrt{(s-1) g d_{50}^3}\,\theta^{5/2}
-\]
+$$
 
 with optional Shields threshold:
-\[
+$$
 q_s = 0 \quad \text{if } \theta \le \theta_c
-\]
+$$
 
 and
-\[
+$$
 \theta = \frac{|\tau_b|}{(\rho_s-\rho_w) g d_{50}}
-\]
+$$
 
 ---
 
 ## Numerical method
 
 - finite volume on a uniform 1D grid
-- MUSCL reconstruction of \(\eta\), \(u\), and \(z_b\) with generalized-minmod limiter
+- MUSCL reconstruction of $\eta$, $u$, and $z_b$ with generalized-minmod limiter
 - Audusse-style hydrostatic reconstruction (well-balanced, positivity-preserving)
 - HLLC approximate Riemann flux
 - SSP-RK2 (Heun's method) time integration
